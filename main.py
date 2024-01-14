@@ -68,6 +68,17 @@ def home():
         all_movies = [movie for movie in result.scalars()]
     return render_template("index.html", movies=all_movies)
 
+@app.route("/edit?<int:id>", methods=["GET", "POST"])
+def edit(id):
+    if request.method == "POST":
+        with app.app_context():
+            movie_to_update = db.get_or_404(Movie, id)
+            movie_to_update.rating = request.form.get("rating")
+            movie_to_update.review = request.form.get("review")
+            db.session.commit()
+            return redirect(url_for("home"))
+    return render_template("edit.html")
+
 
 if __name__ == '__main__':
     app.run(debug=True)
