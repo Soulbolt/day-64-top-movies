@@ -4,10 +4,19 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Float
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField
+from wtforms import StringField, SubmitField, FloatField
 from wtforms.validators import DataRequired
 import requests
 
+# Class to Create edit form with
+class MyUpdateForm(FlaskForm):
+    rating = FloatField(label="Your Rating Out of 10 e.g. 5.5")
+    review = StringField(label="Your Review", validators=[DataRequired()])
+    submit = SubmitField(label="Done")
+
+class MyMovieForm(FlaskForm):
+    title = StringField(label="Movie Title", validators=[DataRequired()])
+    submit = SubmitField(label="Add Movie")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
@@ -68,16 +77,17 @@ def home():
         all_movies = [movie for movie in result.scalars()]
     return render_template("index.html", movies=all_movies)
 
-@app.route("/edit?<int:id>", methods=["GET", "POST"])
-def edit(id):
-    if request.method == "POST":
-        with app.app_context():
-            movie_to_update = db.get_or_404(Movie, id)
-            movie_to_update.rating = request.form.get("rating")
-            movie_to_update.review = request.form.get("review")
-            db.session.commit()
-            return redirect(url_for("home"))
-    return render_template("edit.html")
+@app.route("/edit", methods=["GET", "POST"])
+def edit():
+    update_form = MyUpdateForm()
+    id = request.args.get("id")
+    movie_to_update = db.get_or_404(Movie, id)
+    if update_form.validate_on_submit():
+        movie_to_update.rating = float(update_form.rating.data)
+        movie_to_update.review = update_form.review.data
+        db.session.commit()
+        return redirect(url_for("home"))
+    return render_template("edit.html", movie=movie_to_update, form=update_form)
 
 @app.route("/delete<int:id>", methods=["GET", "POST"])
 def delete(id):
@@ -86,7 +96,13 @@ def delete(id):
         db.session.delete(movie_to_delete)
         db.session.commit()
         return redirect(url_for("home"))
-
+    
+@app.route("/add", methods=["GET", "POST"])
+def add():
+    add_movie_form = MyMovieForm()
+    if add_movie_form.validate_on_submit():
+        return redirect(url_for("home"))
+    return render_template("add.html", form=add_movie_form)
 
 
 if __name__ == '__main__':
