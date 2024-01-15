@@ -4,7 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Float
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, FloatField, IntegerField
+from wtforms import StringField, SubmitField, FloatField
 from wtforms.validators import DataRequired
 import requests
 import os
@@ -20,7 +20,6 @@ MOVIE_API_KEY = os.getenv("TMDB_API_KEY")
 # Class to Create edit form with
 class MyUpdateForm(FlaskForm):
     rating = FloatField(label="Your Rating Out of 10 e.g. 5.5")
-    ranking = IntegerField(label="Your Ranking Out of 10 e.g. 9")
     review = StringField(label="Your Review", validators=[DataRequired()])
     submit = SubmitField(label="Done")
 
@@ -48,8 +47,8 @@ class Movie(db.Model):
     title: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str] = mapped_column(String(250), nullable=False)
-    rating: Mapped[float] = mapped_column(Float, nullable=False)
-    ranking: Mapped[str] = mapped_column(Integer, nullable=False)
+    rating: Mapped[float] = mapped_column(Float, nullable=True)
+    ranking: Mapped[str] = mapped_column(Integer, nullable=True)
     review: Mapped[str] = mapped_column(String(250), nullable=False)
     img_url: Mapped[str] = mapped_column(String(250), nullable=False)
 
@@ -83,9 +82,12 @@ class Movie(db.Model):
 @app.route("/")
 def home():
     with app.app_context():
-        result = db.session.execute(db.select(Movie).order_by(Movie.ranking))
-        all_movies = [movie for movie in result.scalars()]
-    return render_template("index.html", movies=all_movies)
+        result = db.session.execute(db.select(Movie).order_by(Movie.rating))
+        all_movies = result.scalars().all()  # Convert scalarResult to Python List
+        for i in range(len(all_movies)):
+            all_movies[i].ranking = len(all_movies) - i  # This code sets ranking on decending order
+        db.session.commit()    
+        return render_template("index.html", movies=all_movies)
 
 @app.route("/edit", methods=["GET", "POST"])
 def edit():
@@ -94,7 +96,6 @@ def edit():
     movie_to_update = db.get_or_404(Movie, id)
     if update_form.validate_on_submit():
         movie_to_update.rating = float(update_form.rating.data)
-        movie_to_update.ranking = update_form.ranking.data
         movie_to_update.review = update_form.review.data
         db.session.commit()
         return redirect(url_for("home"))
@@ -125,7 +126,6 @@ def find_movie():
         movie_api_url = f"{MOVIE_INFO}/{movie_id}"
         response = requests.get(movie_api_url, params={"api_key": MOVIE_API_KEY, "language": "en-US"})
         data = response.json()
-        print(data)
         new_movie = Movie(
             title = data["title"],
             year = data["release_date"].split("-")[0],
