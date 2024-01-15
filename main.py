@@ -4,17 +4,27 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Float
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, FloatField
+from wtforms import StringField, SubmitField, FloatField, IntegerField
 from wtforms.validators import DataRequired
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+# API info
+MOVIE_SEARCH = "https://api.themoviedb.org/3/search/movie?include_adult=false&language=en-US&page=1"
+MOVIE_INFO = "https://api.themoviedb.org/3/movie/"
+MOVIE_DB_IMAGE_URL = "https://image.tmdb.org/t/p/original/"
+MOVIE_API_KEY = os.getenv("TMDB_API_KEY")
 
 # Class to Create edit form with
 class MyUpdateForm(FlaskForm):
     rating = FloatField(label="Your Rating Out of 10 e.g. 5.5")
+    ranking = IntegerField(label="Your Ranking Out of 10 e.g. 9")
     review = StringField(label="Your Review", validators=[DataRequired()])
     submit = SubmitField(label="Done")
 
-class MyMovieForm(FlaskForm):
+class MovieForm(FlaskForm):
     title = StringField(label="Movie Title", validators=[DataRequired()])
     submit = SubmitField(label="Add Movie")
 
@@ -84,6 +94,7 @@ def edit():
     movie_to_update = db.get_or_404(Movie, id)
     if update_form.validate_on_submit():
         movie_to_update.rating = float(update_form.rating.data)
+        movie_to_update.ranking = update_form.ranking.data
         movie_to_update.review = update_form.review.data
         db.session.commit()
         return redirect(url_for("home"))
@@ -99,11 +110,34 @@ def delete(id):
     
 @app.route("/add", methods=["GET", "POST"])
 def add():
-    add_movie_form = MyMovieForm()
-    if add_movie_form.validate_on_submit():
-        return redirect(url_for("home"))
-    return render_template("add.html", form=add_movie_form)
+    form = MovieForm()
+    if form.validate_on_submit():
+        movie_title = form.title.data
+        response = requests.get(MOVIE_SEARCH, params={"api_key": MOVIE_API_KEY, "query": movie_title})
+        data = response.json()["results"]
+        return render_template("select.html", options=data)
+    return render_template("add.html", form=form)
 
-
+@app.route("/find")
+def find_movie():
+    movie_id = request.args.get("id")
+    if movie_id:
+        movie_api_url = f"{MOVIE_INFO}/{movie_id}"
+        response = requests.get(movie_api_url, params={"api_key": MOVIE_API_KEY, "language": "en-US"})
+        data = response.json()
+        print(data)
+        new_movie = Movie(
+            title = data["title"],
+            year = data["release_date"].split("-")[0],
+            description = data["overview"],
+            rating = 0.0,
+            ranking = 0,
+            review = "None",
+            img_url = f"{MOVIE_DB_IMAGE_URL}{data['poster_path']}"
+        )
+        db.session.add(new_movie)
+        db.session.commit()
+        return redirect(url_for("edit", id=new_movie.id))
+    
 if __name__ == '__main__':
     app.run(debug=True)
