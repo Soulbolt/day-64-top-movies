@@ -15,7 +15,7 @@ load_dotenv()
 MOVIE_SEARCH = "https://api.themoviedb.org/3/search/movie?include_adult=false&language=en-US&page=1"
 MOVIE_INFO = "https://api.themoviedb.org/3/movie/"
 MOVIE_DB_IMAGE_URL = "https://image.tmdb.org/t/p/original/"
-MOVIE_API_KEY = os.getenv("TMDB_API_KEY")
+MOVIE_API_KEY = os.getenv("TMDB_API_KEY")  # need an APY key from https://www.themoviedb.org
 
 # Class to Create edit form with
 class MyUpdateForm(FlaskForm):
@@ -128,7 +128,7 @@ def find_movie():
         data = response.json()
         new_movie = Movie(
             title = data["title"],
-            year = data["release_date"].split("-")[0],
+            year = data["release_date"].split("-")[0],  # We split the release date to grab the year only.
             description = data["overview"],
             rating = 0.0,
             ranking = 0,
